@@ -1,5 +1,5 @@
 /**
- * ESKILLZ Pool (ESP) is a deflationary currency, designed to reward holders, pump price and discourage bots.
+ * Cue (CUE) is a inflationary currency, designed to reward holders, pump price and discourage bots.
 */
 
 // Partial License: MIT
@@ -874,19 +874,14 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
 pragma solidity 0.6.6;
 
 /**
- * ESP is an staking, farming utility, and governance token.
- * It will allow holders to access unique DeFi opportunities and collect 
- * a percentage of the transaction fees.
- *
- * The ESP Token itself is just a standard ERC20, with:
- * No minting afterward.
- * Public burning.
- * Transfer fee applied.
- * Maximum total supply 100000000 ESP
+ * Overview
+ * Medium of Exchange in game
+ * Reward for Staking ESG
+ * Inflationary – new coins can be created by the DAO for extra in-game rewards
  */
-contract ESP is DeflationaryERC20 {
+contract CUE is DeflationaryERC20 {
 
-    constructor() public DeflationaryERC20("ESKILLZ Pool", "ESP") {
+    constructor() public DeflationaryERC20("Cue", "CUE") {
         _mint(msg.sender, 100000000e18);
     }
 

@@ -538,7 +538,7 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
     uint8 private _decimals;
 
     // Transaction Fees:
-    uint8 public txFee = 50; // capped to 10%.
+    uint8 public txFee = 0; // capped to 10%.
     address public feeDistributor; // fees are sent to fee distributer
 
     // Fee Whitelist

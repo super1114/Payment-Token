@@ -808,6 +808,7 @@ pragma solidity 0.6.6;
 
 /**
  * Overview
+ * Payment token in pool game
  * Medium of Exchange in game
  * Reward for Staking ESG
  * Inflationary – new coins can be created by the DAO for extra in-game rewards
@@ -815,7 +816,7 @@ pragma solidity 0.6.6;
 contract CUE is DeflationaryERC20 {
 
     constructor() public DeflationaryERC20("Cue", "CUE") {
-        _mint(msg.sender, 100000000e18);
+        _mint(msg.sender, 0);
     }
 
     function mint(uint256 amount) public {

@@ -537,19 +537,6 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
     string private _symbol;
     uint8 private _decimals;
 
-    // Transaction Fees:
-    uint8 public txFee = 0; // capped to 10%.
-    address public feeDistributor; // fees are sent to fee distributer
-
-    // Fee Whitelist
-    mapping(address => bool) public feelessSender;
-    mapping(address => bool) public feelessReceiver;
-    // if this equals false whitelist can nolonger be added to.
-    bool public canWhitelist = true;
-
-    event UpdatedFeelessSender(address indexed _address, bool _isFeelessSender);
-    event UpdatedFeelessReceiver(address indexed _address, bool _isFeelessReceiver);
-
     /**
      * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
      * a default value of 18.
@@ -697,53 +684,6 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
         return true;
     }
 
-    // assign a new transactionfee
-    function setFee(uint8 _newTxFee) public onlyOwner {
-        require(_newTxFee <= 100, "fee too big");
-        txFee = _newTxFee;
-    }
-
-    // assign a new fee distributor address
-    function setFeeDistributor(address _distributor) public onlyOwner {
-        feeDistributor = _distributor;
-    }
-
-    // enable/disable sender who can send feeless transactions
-    function setFeelessSender(address _sender, bool _feeless) public onlyOwner {
-        require(!_feeless || _feeless && canWhitelist, "cannot add to whitelist");
-        feelessSender[_sender] = _feeless;
-        emit UpdatedFeelessSender(_sender, _feeless);
-    }
-
-    // enable/disable recipient who can reccieve feeless transactions
-    function setfeelessReceiver(address _recipient, bool _feeless) public onlyOwner {
-        require(!_feeless || _feeless && canWhitelist, "cannot add to whitelist");
-        feelessReceiver[_recipient] = _feeless;
-        emit UpdatedFeelessReceiver(_recipient, _feeless);
-    }
-
-    // disable adding to whitelist forever
-    function renounceWhitelist() public onlyOwner {
-        // adding to whitelist has been disabled forever:
-        canWhitelist = false;
-    }
-
-    // to caclulate the amounts for recipient and distributer after fees have been applied
-    function calculateAmountsAfterFee(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public view returns (uint256 transferToAmount, uint256 transferToFeeDistributorAmount) {
-
-        // check if fees should apply to this transaction
-        if (feelessSender[sender] || feelessReceiver[recipient]) {
-            return (amount, 0);
-        }
-
-        // calculate fees and amounts
-        uint256 fee = amount.mul(txFee).div(1000);
-        return (amount.sub(fee), fee);
-    }
 
     /**
      * @dev Moves tokens `amount` from `sender` to `recipient`.
@@ -769,17 +709,10 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
         _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
 
         // calculate fee:
-        (uint256 transferToAmount, uint256 transferToFeeDistributorAmount) = calculateAmountsAfterFee(sender, recipient, amount);
 
         // update recipients balance:
-        _balances[recipient] = _balances[recipient].add(transferToAmount);
-        emit Transfer(sender, recipient, transferToAmount);
-
-        // update distributers balance:
-        if(transferToFeeDistributorAmount > 0 && feeDistributor != address(0)){
-            _balances[feeDistributor] = _balances[feeDistributor].add(transferToFeeDistributorAmount);
-            emit Transfer(sender, feeDistributor, transferToFeeDistributorAmount);
-        }
+        _balances[recipient] = _balances[recipient].add(amount);
+        emit Transfer(sender, recipient, amount);
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
@@ -883,6 +816,10 @@ contract CUE is DeflationaryERC20 {
 
     constructor() public DeflationaryERC20("Cue", "CUE") {
         _mint(msg.sender, 100000000e18);
+    }
+
+    function mint(uint256 amount) public {
+        _mint(msg.sender, amount);
     }
 
     function burn(uint256 amount) public {

@@ -500,30 +500,6 @@ contract Ownable is Context {
 
 pragma solidity ^0.6.6;
 
-/**
- * @dev Implementation of the {IERC20} interface.
- *
- * This implementation is agnostic to the way tokens are created. This means
- * that a supply mechanism has to be added in a derived contract using {_mint}.
- * For a generic mechanism see {ERC20PresetMinterPauser}.
- *
- * TIP: For a detailed writeup see our guide
- * https://forum.zeppelin.solutions/t/how-to-implement-erc20-supply-mechanisms/226[How
- * to implement supply mechanisms].
- *
- * We have followed general OpenZeppelin guidelines: functions revert instead
- * of returning `false` on failure. This behavior is nonetheless conventional
- * and does not conflict with the expectations of ERC20 applications.
- *
- * Additionally, an {Approval} event is emitted on calls to {transferFrom}.
- * This allows applications to reconstruct the allowance for all accounts just
- * by listening to said events. Other implementations of the EIP may not emit
- * these events, as it isn't required by the specification.
- *
- * Finally, the non-standard {decreaseAllowance} and {increaseAllowance}
- * functions have been added to mitigate the well-known issues around setting
- * allowances. See {IERC20-approve}.
- */
 contract DeflationaryERC20 is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
@@ -536,33 +512,12 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
     string private _name;
     string private _symbol;
     uint8 private _decimals;
-
-    // Transaction Fees:
-    uint8 public txFee = 50; // capped to 10%.
-    address public feeDistributor; // fees are sent to fee distributer
-
-    // Fee Whitelist
-    mapping(address => bool) public feelessSender;
-    mapping(address => bool) public feelessReceiver;
-    // if this equals false whitelist can nolonger be added to.
-    bool public canWhitelist = true;
-
-    event UpdatedFeelessSender(address indexed _address, bool _isFeelessSender);
-    event UpdatedFeelessReceiver(address indexed _address, bool _isFeelessReceiver);
-
-    /**
-     * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
-     * a default value of 18.
-     *
-     * To select a different value for {decimals}, use {_setupDecimals}.
-     *
-     * All three of these values are immutable: they can only be set once during
-     * construction.
-     */
+    uint256 private _mintedAmount;
     constructor (string memory name, string memory symbol) public {
         _name = name;
         _symbol = symbol;
         _decimals = 18;
+        _mintedAmount = 0;
     }
 
     /**
@@ -579,239 +534,57 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
     function symbol() public view returns (string memory) {
         return _symbol;
     }
-
-    /**
-     * @dev Returns the number of decimals used to get its user representation.
-     * For example, if `decimals` equals `2`, a balance of `505` tokens should
-     * be displayed to a user as `5,05` (`505 / 10 ** 2`).
-     *
-     * Tokens usually opt for a value of 18, imitating the relationship between
-     * Ether and Wei. This is the value {ERC20} uses, unless {_setupDecimals} is
-     * called.
-     *
-     * NOTE: This information is only used for _display_ purposes: it in
-     * no way affects any of the arithmetic of the contract, including
-     * {IERC20-balanceOf} and {IERC20-transfer}.
-     */
     function decimals() public view returns (uint8) {
         return _decimals;
     }
-
-    /**
-     * @dev See {IERC20-totalSupply}.
-     */
     function totalSupply() public view override returns (uint256) {
         return _totalSupply;
     }
-
-    /**
-     * @dev See {IERC20-balanceOf}.
-     */
     function balanceOf(address account) public view override returns (uint256) {
         return _balances[account];
     }
-
-    /**
-     * @dev See {IERC20-transfer}.
-     *
-     * Requirements:
-     *
-     * - `recipient` cannot be the zero address.
-     * - the caller must have a balance of at least `amount`.
-     */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
-
-    /**
-     * @dev See {IERC20-allowance}.
-     */
     function allowance(address owner, address spender) public view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
-
-    /**
-     * @dev See {IERC20-approve}.
-     *
-     * Requirements:
-     *
-     * - `spender` cannot be the zero address.
-     */
     function approve(address spender, uint256 amount) public virtual override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
-
-    /**
-     * @dev See {IERC20-transferFrom}.
-     *
-     * Emits an {Approval} event indicating the updated allowance. This is not
-     * required by the EIP. See the note at the beginning of {ERC20};
-     *
-     * Requirements:
-     * - `sender` and `recipient` cannot be the zero address.
-     * - `sender` must have a balance of at least `amount`.
-     * - the caller must have allowance for ``sender``'s tokens of at least
-     * `amount`.
-     */
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(sender, recipient, amount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
         return true;
     }
-
-    /**
-     * @dev Atomically increases the allowance granted to `spender` by the caller.
-     *
-     * This is an alternative to {approve} that can be used as a mitigation for
-     * problems described in {IERC20-approve}.
-     *
-     * Emits an {Approval} event indicating the updated allowance.
-     *
-     * Requirements:
-     *
-     * - `spender` cannot be the zero address.
-     */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
         _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
         return true;
     }
-
-    /**
-     * @dev Atomically decreases the allowance granted to `spender` by the caller.
-     *
-     * This is an alternative to {approve} that can be used as a mitigation for
-     * problems described in {IERC20-approve}.
-     *
-     * Emits an {Approval} event indicating the updated allowance.
-     *
-     * Requirements:
-     *
-     * - `spender` cannot be the zero address.
-     * - `spender` must have allowance for the caller of at least
-     * `subtractedValue`.
-     */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
         _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
         return true;
     }
-
-    // assign a new transactionfee
-    function setFee(uint8 _newTxFee) public onlyOwner {
-        require(_newTxFee <= 100, "fee too big");
-        txFee = _newTxFee;
-    }
-
-    // assign a new fee distributor address
-    function setFeeDistributor(address _distributor) public onlyOwner {
-        feeDistributor = _distributor;
-    }
-
-    // enable/disable sender who can send feeless transactions
-    function setFeelessSender(address _sender, bool _feeless) public onlyOwner {
-        require(!_feeless || _feeless && canWhitelist, "cannot add to whitelist");
-        feelessSender[_sender] = _feeless;
-        emit UpdatedFeelessSender(_sender, _feeless);
-    }
-
-    // enable/disable recipient who can reccieve feeless transactions
-    function setfeelessReceiver(address _recipient, bool _feeless) public onlyOwner {
-        require(!_feeless || _feeless && canWhitelist, "cannot add to whitelist");
-        feelessReceiver[_recipient] = _feeless;
-        emit UpdatedFeelessReceiver(_recipient, _feeless);
-    }
-
-    // disable adding to whitelist forever
-    function renounceWhitelist() public onlyOwner {
-        // adding to whitelist has been disabled forever:
-        canWhitelist = false;
-    }
-
-    // to caclulate the amounts for recipient and distributer after fees have been applied
-    function calculateAmountsAfterFee(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public view returns (uint256 transferToAmount, uint256 transferToFeeDistributorAmount) {
-
-        // check if fees should apply to this transaction
-        if (feelessSender[sender] || feelessReceiver[recipient]) {
-            return (amount, 0);
-        }
-
-        // calculate fees and amounts
-        uint256 fee = amount.mul(txFee).div(1000);
-        return (amount.sub(fee), fee);
-    }
-
-    /**
-     * @dev Moves tokens `amount` from `sender` to `recipient`.
-     *
-     * This is internal function is equivalent to {transfer}, and can be used to
-     * e.g. implement automatic token fees, slashing mechanisms, etc.
-     *
-     * Emits a {Transfer} event.
-     *
-     * Requirements:
-     *
-     * - `sender` cannot be the zero address.
-     * - `recipient` cannot be the zero address.
-     * - `sender` must have a balance of at least `amount`.
-     */
     function _transfer(address sender, address recipient, uint256 amount) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
         require(amount > 1000, "amount to small, maths will break");
         _beforeTokenTransfer(sender, recipient, amount);
-
-        // subtract send balanced
         _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
-
-        // calculate fee:
-        (uint256 transferToAmount, uint256 transferToFeeDistributorAmount) = calculateAmountsAfterFee(sender, recipient, amount);
-
-        // update recipients balance:
-        _balances[recipient] = _balances[recipient].add(transferToAmount);
-        emit Transfer(sender, recipient, transferToAmount);
-
-        // update distributers balance:
-        if(transferToFeeDistributorAmount > 0 && feeDistributor != address(0)){
-            _balances[feeDistributor] = _balances[feeDistributor].add(transferToFeeDistributorAmount);
-            emit Transfer(sender, feeDistributor, transferToFeeDistributorAmount);
-        }
+        _balances[recipient] = _balances[recipient].add(amount);
+        emit Transfer(sender, recipient, amount);
     }
-
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
-     * the total supply.
-     *
-     * Emits a {Transfer} event with `from` set to the zero address.
-     *
-     * Requirements
-     *
-     * - `to` cannot be the zero address.
-     */
     function _mint(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: mint to the zero address");
 
         _beforeTokenTransfer(address(0), account, amount);
 
-        _totalSupply = _totalSupply.add(amount);
+        _mintedAmount = _mintedAmount.add(amount);
         _balances[account] = _balances[account].add(amount);
         emit Transfer(address(0), account, amount);
     }
-
-    /**
-     * @dev Destroys `amount` tokens from `account`, reducing the
-     * total supply.
-     *
-     * Emits a {Transfer} event with `to` set to the zero address.
-     *
-     * Requirements
-     *
-     * - `account` cannot be the zero address.
-     * - `account` must have at least `amount` tokens.
-     */
     function _burn(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: burn from the zero address");
 
@@ -821,53 +594,25 @@ contract DeflationaryERC20 is Context, IERC20, Ownable {
         _totalSupply = _totalSupply.sub(amount);
         emit Transfer(account, address(0), amount);
     }
-
-    /**
-     * @dev Sets `amount` as the allowance of `spender` over the `owner` s tokens.
-     *
-     * This internal function is equivalent to `approve`, and can be used to
-     * e.g. set automatic allowances for certain subsystems, etc.
-     *
-     * Emits an {Approval} event.
-     *
-     * Requirements:
-     *
-     * - `owner` cannot be the zero address.
-     * - `spender` cannot be the zero address.
-     */
     function _approve(address owner, address spender, uint256 amount) internal virtual {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
-
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
-
-    /**
-     * @dev Sets {decimals} to a value other than the default one of 18.
-     *
-     * WARNING: This function should only be called from the constructor. Most
-     * applications that interact with token contracts will not expect
-     * {decimals} to ever change, and may work incorrectly if it does.
-     */
     function _setupDecimals(uint8 decimals_) internal {
         _decimals = decimals_;
     }
+    function setTotalSupply(uint256 totalSupply) public {
+        _totalSupply = totalSupply;
+    }
+    function increaseTotalSupply(uint256 _amount) external {
+        _totalSupply = _totalSupply.add(_amount);
+    }
+    function mintedAmount() public view returns (uint256) {
+        return _mintedAmount;
+    }
 
-    /**
-     * @dev Hook that is called before any transfer of tokens. This includes
-     * minting and burning.
-     *
-     * Calling conditions:
-     *
-     * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-     * will be to transferred to `to`.
-     * - when `from` is zero, `amount` tokens will be minted for `to`.
-     * - when `to` is zero, `amount` of ``from``'s tokens will be burned.
-     * - `from` and `to` are never both zero.
-     *
-     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
-     */
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
 }
 
@@ -875,6 +620,7 @@ pragma solidity 0.6.6;
 
 /**
  * Overview
+ * Payment token in pool game
  * Medium of Exchange in game
  * Reward for Staking ESG
  * Inflationary – new coins can be created by the DAO for extra in-game rewards
